@@ -14,47 +14,80 @@
 #define LCD2_Dir  DDRD			/* Define LCD data port direction */
 #define LCD2_Port PORTD			/* Define LCD data port */
 
-
 #include <stdlib.h>
 #include <stdio.h>
 #define DHT11_PIN 5
 uint8_t c=0,I_RH,D_RH,I_Temp,D_Temp,CheckSum;
 
 
-void lcdcmd(unsigned int lcd, unsigned char cmnd )
+void lcdcmd(int lcd, unsigned char cmnd )
 {
-	LCD1_Port = (LCD1_Port & 0x0F) | (cmnd & 0xF0); /* sending upper nibble */
-	LCD1_Port &= ~ (1<<RS);		/* RS=0, command reg. */
-	LCD1_Port |= (1<<EN);		/* Enable pulse */
-	_delay_us(1);
-	LCD1_Port &= ~ (1<<EN);
-	_delay_us(2);
-	LCD1_Port = (LCD1_Port & 0x0F) | (cmnd << 4);  /* sending lower nibble */
-	LCD1_Port |= (1<<EN);
-	_delay_us(1);
-	LCD1_Port &= ~ (1<<EN);
-	_delay_ms(2);
+	if(lcd==1)
+		{
+		LCD1_Port = (LCD1_Port & 0x0F) | (cmnd & 0xF0); /* sending upper nibble */
+		LCD1_Port &= ~ (1<<RS);		/* RS=0, command reg. */
+		LCD1_Port |= (1<<EN);		/* Enable pulse */
+		_delay_us(1);
+		LCD1_Port &= ~ (1<<EN);
+		_delay_us(2);
+		LCD1_Port = (LCD1_Port & 0x0F) | (cmnd << 4);  /* sending lower nibble */
+		LCD1_Port |= (1<<EN);
+		_delay_us(1);
+		LCD1_Port &= ~ (1<<EN);
+		_delay_ms(2);
+		}
+		else{
+			LCD2_Port = (LCD2_Port & 0x0F) | (cmnd & 0xF0); /* sending upper nibble */
+			LCD2_Port &= ~ (1<<RS);		/* RS=0, command reg. */
+			LCD2_Port |= (1<<EN);		/* Enable pulse */
+			_delay_us(1);
+			LCD2_Port &= ~ (1<<EN);
+			_delay_us(2);
+			LCD2_Port = (LCD2_Port & 0x0F) | (cmnd << 4);  /* sending lower nibble */
+			LCD2_Port |= (1<<EN);
+			_delay_us(1);
+			LCD2_Port &= ~ (1<<EN);
+			_delay_ms(2);
+			
+		}
 }
 
 
-void lcddata( unsigned char data )
+void lcddata(int lcd, unsigned char data )
 {
-	LCD1_Port = (LCD1_Port & 0x0F) | (data & 0xF0); /* sending upper nibble */
-	LCD1_Port |= (1<<RS);		/* RS=1, data reg. */
-	LCD1_Port|= (1<<EN);
-	_delay_us(1);
-	LCD1_Port &= ~ (1<<EN);
-	_delay_us(2);
-	LCD1_Port = (LCD1_Port & 0x0F) | (data << 4); /* sending lower nibble */
-	LCD1_Port |= (1<<EN);
-	_delay_us(1);
-	LCD1_Port &= ~ (1<<EN);
-	_delay_ms(2);
+	if(lcd==1)
+		{
+		LCD1_Port = (LCD1_Port & 0x0F) | (data & 0xF0); /* sending upper nibble */
+		LCD1_Port |= (1<<RS);		/* RS=1, data reg. */
+		LCD1_Port|= (1<<EN);
+		_delay_us(1);
+		LCD1_Port &= ~ (1<<EN);
+		_delay_us(2);
+		LCD1_Port = (LCD1_Port & 0x0F) | (data << 4); /* sending lower nibble */
+		LCD1_Port |= (1<<EN);
+		_delay_us(1);
+		LCD1_Port &= ~ (1<<EN);
+		_delay_ms(2);
+		}
+		else{
+			LCD2_Port = (LCD2_Port & 0x0F) | (data & 0xF0); /* sending upper nibble */
+			LCD2_Port |= (1<<RS);		/* RS=1, data reg. */
+			LCD2_Port|= (1<<EN);
+			_delay_us(1);
+			LCD2_Port &= ~ (1<<EN);
+			_delay_us(2);
+			LCD2_Port = (LCD2_Port & 0x0F) | (data << 4); /* sending lower nibble */
+			LCD2_Port |= (1<<EN);
+			_delay_us(1);
+			LCD2_Port &= ~ (1<<EN);
+			_delay_ms(2);
+		}
 }
 
 void lcdInit (void)			/* LCD Initialize function */
 {
 	LCD1_Dir = 0xFF;			/* Make LCD port direction as o/p */
+	LCD2_Dir = 0xFF;			/* Make LCD port direction as o/p */
 	_delay_ms(20);			/* LCD Power ON delay always >15ms */
 	
 	lcdcmd(1,0x02);		/* send for 4 bit initialization of LCD  */
@@ -63,24 +96,50 @@ void lcdInit (void)			/* LCD Initialize function */
 	lcdcmd(1,0x06);              /* Increment cursor (shift cursor to right)*/
 	lcdcmd(1,0x01);              /* Clear display screen*/
 	_delay_ms(2);
+	
+	lcdcmd(2,0x02);		/* send for 4 bit initialization of LCD  */
+	lcdcmd(2,0x28);              /* 2 line, 5*7 matrix in 4-bit mode */
+	lcdcmd(2,0x0c);              /* Display on cursor off*/
+	lcdcmd(2,0x06);              /* Increment cursor (shift cursor to right)*/
+	lcdcmd(2,0x01);              /* Clear display screen*/
+	_delay_ms(2);
+		
 }
 
 
-void lcdWrite (char *str)		/* Send string to LCD function */
+void lcdWrite (int lcd, char *str)		/* Send string to LCD function */
 {
-	int i;
-	for(i=0;str[i]!=0;i++)		/* Send each char of string till the NULL */
+	if(lcd==1)
 	{
-		lcddata (str[i]);
+		int i;
+		for(i=0;str[i]!=0;i++)		/* Send each char of string till the NULL */
+		{
+			lcddata (1,str[i]);
+		}
+	}
+	else{
+		int j;
+		for(j=0;str[j]!=0;j++)		/* Send each char of string till the NULL */
+		{
+			lcddata (2,str[j]);
+		}
 	}
 }
 
 
-void lcdClear()
+void lcdClear(int lcd)
 {
-	lcdcmd (1,0x01);		/* Clear display */
-	_delay_ms(2);
-	lcdcmd (1,0x80);		/* Cursor at home position */
+	if(lcd==1)
+	{
+		lcdcmd (1,0x01);		/* Clear display */
+		_delay_ms(2);
+		lcdcmd (1,0x80);		/* Cursor at home position */
+	}
+	else{
+		lcdcmd (2,0x01);		/* Clear display */
+		_delay_ms(2);
+		lcdcmd (2,0x80);		/* Cursor at home position */
+	}
 }
 
 void Request()				/* Microcontroller send start pulse/request */
@@ -124,11 +183,13 @@ int main()
 	char data[5];
 	lcdInit();			/* Initialization of LCD*/
 	int v = 0;
-	lcdWrite("Humidity: ");	/* Write string on 1st line of LCD*/
+	lcdWrite(1,"Humidity: ");	/* Write string on 1st line of LCD*/
 	lcdcmd(1,0xC0);		/* Go to 2nd line*/
-	lcdWrite("Temp: ");	/* Write string on 2nd line*/
+	lcdWrite(1,"Temp: ");	/* Write string on 2nd line*/
 	
-	
+	lcdWrite(2,"Humidity: ");	/* Write string on 1st line of LCD*/
+	lcdcmd(2,0xC0);		/* Go to 2nd line*/
+	lcdWrite(2,"Temp: ");	/* Write string on 2nd line*/
 	while(1){
 		
 		
@@ -163,19 +224,19 @@ int main()
 		
 		if ((I_RH + D_RH + I_Temp + D_Temp) != CheckSum)
 		{
-			lcdClear();
-			lcdWrite("Error");
+			lcdClear(1);
+			lcdWrite(1,"Error");
 		}
 		
 		else if(D_Temp>40){
-			lcdClear();
-			lcdWrite("High Humidity");
+			lcdClear(1);
+			lcdWrite(1,"High Humidity");
 			//_delay_us(1000);
 			v =1;
 		}
 		else if(I_Temp>40){
-			lcdClear();
-			lcdWrite("High Temperature");
+			lcdClear(1);
+			lcdWrite(1,"High Temperature");
 			PORTB |= 0b00010000;
 			PORTA |= 0b01000000;
 			//_delay_us(1000);
@@ -186,35 +247,35 @@ int main()
 			PORTB &= ~(0b00010000);
 			PORTA &= ~(0b01000000);
 			if(v==1){
-				lcdClear();			/* Initialization of LCD*/
-				lcdWrite("Humidity: ");	/* Write string on 1st line of LCD*/
+				lcdClear(1);			/* Initialization of LCD*/
+				lcdWrite(1,"Humidity: ");	/* Write string on 1st line of LCD*/
 				lcdcmd(1,0xC0);		/* Go to 2nd line*/
-				lcdWrite("Temp: ");
+				lcdWrite(1,"Temp: ");
 				v=0;
 			}
 			itoa(I_RH,data,10);
 			lcdcmd(1,0x8A);
-			lcdWrite(data);
-			lcdWrite(".");
+			lcdWrite(1,data);
+			lcdWrite(1,".");
 			
 			itoa(D_RH,data,10);
-			lcdWrite(data);
-			lcdWrite("%");
+			lcdWrite(1,data);
+			lcdWrite(1,"%");
 			
 			
 			itoa(I_Temp,data,10);
 			lcdcmd(1,0xC6);
-			lcdWrite(data);
-			lcdWrite(".");
+			lcdWrite(1,data);
+			lcdWrite(1,".");
 			
 			itoa(D_Temp,data,10);
-			lcdWrite(data);
-			lcddata(0xDF);
-			lcdWrite("C ");
+			lcdWrite(1,data);
+			lcddata(1,0xDF);
+			lcdWrite(1,"C ");
 			
 			itoa(CheckSum,data,10);
-			lcdWrite(data);
-			lcdWrite(" ");
+			lcdWrite(1,data);
+			lcdWrite(1," ");
 		}
 		_delay_ms(10);
 	}
