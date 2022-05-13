@@ -19,6 +19,18 @@
 #define DHT11_PIN 5
 uint8_t c=0,I_RH,D_RH,I_Temp,D_Temp,CheckSum;
 
+float Ro=10;    
+#include "adc.h"
+#include "mq5.h"
+#define RL_VALUE (10)     //define the load resistance on the board, in kilo ohms
+#define RO_CLEAN_AIR_FACTOR (6.5)  //(Sensor resistance in clean air)/RO,which is derived from the chart in data sheet
+#define CO (0)         // Gas identity no.
+#define CH4 (1)
+
+//data formula obtained for the MQ5 sensor for measuring different gases.
+float Values1[5] = {-2.5279,-2.5474,-4.2302,-4.5008,-7.358};
+float Values2[5] = {1.8771,2.2636,3.0935,4.8216,6.4758};
+
 
 void lcdcmd(int lcd, unsigned char cmnd )
 {
@@ -174,23 +186,142 @@ uint8_t Receive_data()			/* receive data */
 }
 
 
+// sensor and load resistor forms a voltage divider. so using analog value and load value
+// we will find sensor resistor.
+
+float ResistanceCalculation(int raw_adc){
+	return ( ((float)RL_VALUE*(1023-raw_adc)/raw_adc));   // we will find sensor resistor.
+}
+
+float SensorCalibration(){
+
+	int i;                                   // This function assumes that sensor is in clean air.
+	float val=0;
+	
+	for (i=0;i<50;i++){                   //take multiple samples and calculate the average value
+		val += ResistanceCalculation(adcread(0));
+		_delay_ms(50);//change me to 500
+	}
+
+	val = val/50;
+	val = val/RO_CLEAN_AIR_FACTOR;           //divided by RO_CLEAN_AIR_FACTOR yields the Ro according to the chart in the datasheet
+	
+	return val;
+}
+
+float ReadSensor(){
+	int i;
+	float rs=0;
+
+	for (i=0;i<5;i++) {                                 // take multiple readings and average it.
+		rs += ResistanceCalculation(adcread(0));   // rs changes according to gas concentration.
+		_delay_ms(50);
+	}
+
+	rs = rs/5;
+	
+	return rs;
+}
+
+int GetGasPercentage(float rs_ro_ratio, int gas_id){
+	if ( gas_id == CO ) {
+		return GetPercentagee(rs_ro_ratio,Values1[0],Values2[0]);
+	}
+	else if( gas_id == CH4 ) {
+		return GetPercentagee(rs_ro_ratio,Values1[1],Values2[1]);
+	}
+
+	return 0;
+}
+
+
+// as in curves are on logarithmic coordinate, power of 10 is taken to convert result to non-logarithmic.
+int  GetPercentagee(float rs_ro_ratio, float val1,float val2){
+	return (pow(10,( (log(rs_ro_ratio)*val1) + val2)));
+}
+
+
+void adcinit(){
+	//make PA0 an analog input
+	DDRA &= ~(1<<PA0);
+	//enable ADC module, set prescalar of 128 which gives CLK/128
+	ADCSRA |= (1<<ADEN) | (1<<ADPS2) | (1<<ADPS1) | (1<<ADPS0);
+	//set the voltage reference using REFS1 and REFS0 bits and select the ADC channel using the MUX bits
+	ADMUX = 0b01000000;      // set REFS1 = 0 |REFS0 = 1 (Vref as AVCC pin) | ADLAR = 0(right adjusted) |  MUX4 to MUX0 is 0000 for ADC0
+}
+
+int adcread(char channel){
+	/* set input channel to read */
+	ADMUX = 0x40 | (channel & 0x07);   // 0100 0000 | (channel & 0000 0100)
+	/* Start ADC conversion */
+	ADCSRA |= (1<<ADSC);
+	/* Wait until end of conversion by polling ADC interrupt flag */
+	while (!(ADCSRA & (1<<ADIF)));
+	/* Clear interrupt flag */
+	ADCSRA |= (1<<ADIF);
+	_delay_ms(1);                      /* Wait a little bit */
+	/* Return ADC word */
+	return ADCW;
+}
+
+
+
 int main()
 {
 	DDRB = 0b11110000;
 	DDRA = 0b01000000;
 	DDRD = 0xFF;
 	
+	char Res[16], co[16], ch4[16];
+	lcdInit();/* Initialization of LCD*/
+	adcinit();
+	lcdWrite(2,"Calibrating...");
+	Ro = SensorCalibration();                       //Please make sure the sensor is in clean air when you perform the calibration
+	dtostrf(Ro, 6, 2, Res);
+	lcdClear(2);
+	_delay_ms(2);	//clearing takes around 1.64ms to execute
+	lcdWrite(2,"Calibration done...");
+	_delay_ms(2000);
+	lcdClear(2);
+	_delay_ms(2);	//clearing takes around 1.64ms to execute
+	lcdWrite(2,"CO:");
+	lcdcmd(2,0x8D);
+	lcdWrite(2,"PPM");
+	lcdcmd(2,0xC0);
+	lcdWrite(2,"CH4:");
+	lcdcmd(2,0xCD);
+	lcdWrite(2,"PPM");
+	
+	
+	
 	char data[5];
-	lcdInit();			/* Initialization of LCD*/
 	int v = 0;
 	lcdWrite(1,"Humidity: ");	/* Write string on 1st line of LCD*/
 	lcdcmd(1,0xC0);		/* Go to 2nd line*/
 	lcdWrite(1,"Temp: ");	/* Write string on 2nd line*/
 	
-	lcdWrite(2,"Humidity: ");	/* Write string on 1st line of LCD*/
-	lcdcmd(2,0xC0);		/* Go to 2nd line*/
-	lcdWrite(2,"Temp: ");	/* Write string on 2nd line*/
+	
 	while(1){
+		
+		itoa(GetGasPercentage(ReadSensor()/Ro,CO), co, 10);
+		if (atoi(co)>10)
+		{
+			lcdClear(2);
+			lcdWrite(1,"High Co Values");
+			PORTB |= 0b00100000;
+		} 
+		else
+		{
+			PORTB &= ~(0b00100000);
+			itoa(GetGasPercentage(ReadSensor()/Ro,CO), co, 10);
+			lcdcmd(2,0x89);
+			lcdWrite(2,co);
+			itoa(GetGasPercentage(ReadSensor()/Ro,CH4), ch4, 10);
+			lcdcmd(2,0xC9);
+			lcdWrite(2,ch4);
+		}
+		
+		
 		
 		
 		//Panic Button
@@ -244,6 +375,8 @@ int main()
 		}
 		else
 		{
+	
+			
 			PORTB &= ~(0b00010000);
 			PORTA &= ~(0b01000000);
 			if(v==1){
@@ -276,6 +409,8 @@ int main()
 			itoa(CheckSum,data,10);
 			lcdWrite(1,data);
 			lcdWrite(1," ");
+			
+			
 		}
 		_delay_ms(10);
 	}
