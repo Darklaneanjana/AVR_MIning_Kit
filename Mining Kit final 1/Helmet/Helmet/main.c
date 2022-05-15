@@ -16,6 +16,7 @@
  _delay_ms(500);
  PORTC = 0x00;
  }
+ 
  int main(void)
  {
  DDRA = 0x00;

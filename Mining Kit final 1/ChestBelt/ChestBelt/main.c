@@ -278,6 +278,7 @@ int main()
 	lcdWrite(2,"Calibrating...");
 	Ro = SensorCalibration();                       //Please make sure the sensor is in clean air when you perform the calibration
 	dtostrf(Ro, 6, 2, Res);
+	
 	lcdClear(2);
 	_delay_ms(2);	//clearing takes around 1.64ms to execute
 	lcdWrite(2,"Calibration done...");
@@ -405,11 +406,7 @@ int main()
 			lcdWrite(1,data);
 			lcddata(1,0xDF);
 			lcdWrite(1,"C ");
-			
-			itoa(CheckSum,data,10);
-			lcdWrite(1,data);
-			lcdWrite(1," ");
-			
+	
 			
 		}
 		_delay_ms(10);
