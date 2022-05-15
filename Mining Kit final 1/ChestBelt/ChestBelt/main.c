@@ -297,6 +297,7 @@ int main()
 	
 	char data[5];
 	int v = 0;
+	int w = 0;
 	lcdWrite(1,"Humidity: ");	/* Write string on 1st line of LCD*/
 	lcdcmd(1,0xC0);		/* Go to 2nd line*/
 	lcdWrite(1,"Temp: ");	/* Write string on 2nd line*/
@@ -308,11 +309,22 @@ int main()
 		if (atoi(co)>10)
 		{
 			lcdClear(2);
-			lcdWrite(1,"High Co Values");
+			lcdWrite(2,"High Co Values");
 			PORTB |= 0b00100000;
 		} 
 		else
 		{
+			if(w==1){
+				lcdClear(1);			/* Initialization of LCD*/
+				lcdWrite(2,"CO:");
+				lcdcmd(2,0x8D);
+				lcdWrite(2,"PPM");
+				lcdcmd(2,0xC0);
+				lcdWrite(2,"CH4:");
+				lcdcmd(2,0xCD);
+				lcdWrite(2,"PPM");
+				w=0;
+			}
 			PORTB &= ~(0b00100000);
 			itoa(GetGasPercentage(ReadSensor()/Ro,CO), co, 10);
 			lcdcmd(2,0x89);
